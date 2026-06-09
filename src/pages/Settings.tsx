@@ -62,7 +62,7 @@ export default function Settings() {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/users')
+      const res = await fetch('/api/users', { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setUsers(data.data || [])
@@ -122,6 +122,7 @@ export default function Settings() {
       const method = userModal.editId ? 'PUT' : 'POST'
       const res = await fetch(url, {
         method,
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userForm),
       })
@@ -144,6 +145,7 @@ export default function Settings() {
     try {
       await fetch(`/api/users/${userId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !enabled }),
       })
@@ -180,6 +182,7 @@ export default function Settings() {
     try {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           oldPassword: passwordForm.oldPassword,

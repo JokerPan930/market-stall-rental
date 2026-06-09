@@ -40,7 +40,7 @@ export default function Dashboard() {
   // 获取仪表盘数据
   const fetchDashboard = async () => {
     try {
-      const res = await fetch('/api/dashboard')
+      const res = await fetch('/api/dashboard', { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setStats(data.data)

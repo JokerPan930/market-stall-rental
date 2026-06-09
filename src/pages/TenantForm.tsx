@@ -29,7 +29,7 @@ export default function TenantForm() {
   // 获取租户信息（编辑模式）
   const fetchTenant = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tenants/${id}`)
+      const res = await fetch(`/api/tenants/${id}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success && data.data) {
         const tenant = data.data
@@ -84,6 +84,7 @@ export default function TenantForm() {
       const method = isEdit ? 'PUT' : 'POST'
       const res = await fetch(url, {
         method,
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })

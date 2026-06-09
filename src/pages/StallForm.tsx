@@ -29,7 +29,7 @@ export default function StallForm() {
   // 获取摊位信息（编辑模式）
   const fetchStall = useCallback(async () => {
     try {
-      const res = await fetch(`/api/stalls/${id}`)
+      const res = await fetch(`/api/stalls/${id}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success && data.data) {
         const stall = data.data
@@ -88,6 +88,7 @@ export default function StallForm() {
       const method = isEdit ? 'PUT' : 'POST'
       const res = await fetch(url, {
         method,
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,

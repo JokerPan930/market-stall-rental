@@ -40,7 +40,7 @@ export default function TenantDetail() {
   const fetchTenantDetail = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/tenants/${id}`)
+      const res = await fetch(`/api/tenants/${id}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setTenant(data.data)

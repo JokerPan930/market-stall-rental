@@ -33,7 +33,7 @@ export default function Tenants() {
       })
       if (search) params.set('search', search)
 
-      const res = await fetch(`/api/tenants?${params}`)
+      const res = await fetch(`/api/tenants?${params}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setTenants(data.data || [])

@@ -50,8 +50,8 @@ export default function LeaseForm() {
   const fetchOptions = async () => {
     try {
       const [stallsRes, tenantsRes] = await Promise.all([
-        fetch('/api/stalls?status=available&pageSize=100'),
-        fetch('/api/tenants?pageSize=100'),
+        fetch('/api/stalls?status=available&pageSize=100', { credentials: 'include' }),
+        fetch('/api/tenants?pageSize=100', { credentials: 'include' }),
       ])
       const stallsData = await stallsRes.json()
       const tenantsData = await tenantsRes.json()
@@ -113,6 +113,7 @@ export default function LeaseForm() {
     try {
       const res = await fetch('/api/leases', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,

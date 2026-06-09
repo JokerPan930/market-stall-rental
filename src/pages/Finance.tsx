@@ -66,7 +66,7 @@ export default function Finance() {
       if (activeTab) params.set('status', activeTab)
       if (monthFilter) params.set('month', monthFilter)
 
-      const res = await fetch(`/api/fees?${params}`)
+      const res = await fetch(`/api/fees?${params}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setFees(data.data?.records || [])
@@ -97,7 +97,7 @@ export default function Finance() {
   // 批量生成费用
   const handleBatchGenerate = async () => {
     try {
-      const res = await fetch('/api/fees/generate', { method: 'POST' })
+      const res = await fetch('/api/fees/generate', { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         fetchFees()
@@ -128,6 +128,7 @@ export default function Finance() {
     try {
       const res = await fetch(`/api/fees/${payModal.id}/pay`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           paidAmount: Number(payAmount),

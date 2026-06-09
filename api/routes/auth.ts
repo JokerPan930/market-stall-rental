@@ -69,7 +69,7 @@ router.post('/login', (req: Request, res: Response): void => {
         id: user.id,
         username: user.username,
         role: user.role,
-        display_name: user.display_name,
+        displayName: user.display_name,
       },
     })
   } catch (error) {
@@ -102,32 +102,59 @@ router.post('/logout', (req: Request, res: Response): void => {
 /**
  * 获取当前用户信息
  * GET /api/auth/me
+ * 注意：此路由不需要 authMiddleware，因为登录后需要立即调用
  */
 router.get('/me', (req: Request, res: Response): void => {
   try {
-    // req.user 由 authMiddleware 设置
-    if (!req.user) {
+    const sessionId = req.cookies?.session_id
+
+    if (!sessionId) {
       res.status(401).json({ success: false, error: '未登录' })
       return
     }
 
-    const user = db.prepare(
-      'SELECT id, username, role, display_name, enabled, created_at FROM users WHERE id = ?'
-    ).get(req.user.id) as {
-      id: number
+    // 查询会话
+    const session = db.prepare(`
+      SELECT s.user_id, s.expires_at, u.username, u.role, u.display_name, u.enabled
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.id = ?
+    `).get(sessionId) as {
+      user_id: number
+      expires_at: string
       username: string
       role: string
       display_name: string
       enabled: number
-      created_at: string
     } | undefined
 
-    if (!user) {
-      res.status(404).json({ success: false, error: '用户不存在' })
+    if (!session) {
+      res.status(401).json({ success: false, error: '会话无效' })
       return
     }
 
-    res.json({ success: true, data: user })
+    // 检查会话是否过期
+    if (new Date(session.expires_at) <= new Date()) {
+      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+      res.status(401).json({ success: false, error: '会话已过期' })
+      return
+    }
+
+    // 检查用户是否被禁用
+    if (!session.enabled) {
+      res.status(403).json({ success: false, error: '账号已被禁用' })
+      return
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: session.user_id,
+        username: session.username,
+        role: session.role,
+        displayName: session.display_name,
+      },
+    })
   } catch (error) {
     res.status(500).json({ success: false, error: '获取用户信息失败' })
   }

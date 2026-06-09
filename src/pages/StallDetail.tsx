@@ -42,7 +42,7 @@ export default function StallDetail() {
   const fetchStallDetail = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/stalls/${id}`)
+      const res = await fetch(`/api/stalls/${id}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setStall(data.data)

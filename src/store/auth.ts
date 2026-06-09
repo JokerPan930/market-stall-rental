@@ -28,6 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password, remember }),
       })
       const data = await res.json()
@@ -46,7 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   // 获取当前用户信息
   fetchMe: async () => {
     try {
-      const res = await fetch('/api/auth/me')
+      const res = await fetch('/api/auth/me', { credentials: 'include' })
       const data = await res.json()
       if (data.success && data.data) {
         set({ user: data.data, loading: false })
@@ -61,7 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   // 退出登录
   logout: async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     } finally {
       set({ user: null })
     }

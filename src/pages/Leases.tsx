@@ -48,7 +48,7 @@ export default function Leases() {
       })
       if (activeTab) params.set('status', activeTab)
 
-      const res = await fetch(`/api/leases?${params}`)
+      const res = await fetch(`/api/leases?${params}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setLeases(data.data || [])
@@ -77,7 +77,7 @@ export default function Leases() {
   const handleTerminate = async () => {
     if (!terminateId) return
     try {
-      await fetch(`/api/leases/${terminateId}/terminate`, { method: 'POST' })
+      await fetch(`/api/leases/${terminateId}/terminate`, { method: 'POST', credentials: 'include' })
     } catch {
       // 忽略错误
     }

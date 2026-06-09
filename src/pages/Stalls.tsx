@@ -44,7 +44,7 @@ export default function Stalls() {
       if (statusFilter) params.set('status', statusFilter)
       if (search) params.set('search', search)
 
-      const res = await fetch(`/api/stalls?${params}`)
+      const res = await fetch(`/api/stalls?${params}`, { credentials: 'include' })
       const data = await res.json()
       if (data.success) {
         setStalls(data.data || [])
@@ -73,7 +73,7 @@ export default function Stalls() {
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      await fetch(`/api/stalls/${deleteId}`, { method: 'DELETE' })
+      await fetch(`/api/stalls/${deleteId}`, { method: 'DELETE', credentials: 'include' })
     } catch {
       // 忽略错误
     }
