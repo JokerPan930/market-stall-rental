@@ -8,13 +8,14 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 // 租赁合同数据类型
 interface Lease {
   id: number
-  leaseNumber: string
-  stallNumber: string
+  stallNo: string
   tenantName: string
   startDate: string
   endDate: string
   monthlyRent: number
+  deposit: number
   status: string
+  remark?: string
 }
 
 // 状态筛选Tab
@@ -60,10 +61,10 @@ export default function Leases() {
       // 使用模拟数据
     }
     setLeases([
-      { id: 1, leaseNumber: 'HT-2025-001', stallNumber: 'A-001', tenantName: '张三', startDate: '2025-01-01', endDate: '2026-12-31', monthlyRent: 3000, status: 'active' },
-      { id: 2, leaseNumber: 'HT-2025-002', stallNumber: 'B-015', tenantName: '李四', startDate: '2025-03-01', endDate: '2026-06-30', monthlyRent: 2800, status: 'expiring' },
-      { id: 3, leaseNumber: 'HT-2024-003', stallNumber: 'C-008', tenantName: '王五', startDate: '2024-01-01', endDate: '2025-12-31', monthlyRent: 3500, status: 'expired' },
-      { id: 4, leaseNumber: 'HT-2024-004', stallNumber: 'D-012', tenantName: '赵六', startDate: '2024-06-01', endDate: '2025-05-31', monthlyRent: 2500, status: 'terminated' },
+      { id: 1, stallNo: 'A-001', tenantName: '张三', startDate: '2025-01-01', endDate: '2026-12-31', monthlyRent: 3000, deposit: 6000, status: 'active' },
+      { id: 2, stallNo: 'B-015', tenantName: '李四', startDate: '2025-03-01', endDate: '2026-06-30', monthlyRent: 2800, deposit: 5600, status: 'expiring' },
+      { id: 3, stallNo: 'C-008', tenantName: '王五', startDate: '2024-01-01', endDate: '2025-12-31', monthlyRent: 3500, deposit: 7000, status: 'expired' },
+      { id: 4, stallNo: 'D-012', tenantName: '赵六', startDate: '2024-06-01', endDate: '2025-05-31', monthlyRent: 2500, deposit: 5000, status: 'terminated' },
     ])
     setTotal(4)
     setLoading(false)
@@ -126,7 +127,6 @@ export default function Leases() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-5 py-3 font-medium text-slate-600">合同编号</th>
                 <th className="text-left px-5 py-3 font-medium text-slate-600">摊位号</th>
                 <th className="text-left px-5 py-3 font-medium text-slate-600">租户名</th>
                 <th className="text-left px-5 py-3 font-medium text-slate-600">租期</th>
@@ -138,22 +138,21 @@ export default function Leases() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-500">加载中...</td>
-                </tr>
+                  <td colSpan={6} className="text-center py-8 text-slate-500">加载中...</td>
+              </tr>
               ) : leases.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-500">暂无数据</td>
+                  <td colSpan={6} className="text-center py-8 text-slate-500">暂无数据</td>
                 </tr>
               ) : (
                 leases.map((lease) => (
                   <tr key={lease.id} className="border-b border-slate-100 table-row-hover transition-colors">
-                    <td className="px-5 py-3 font-medium text-slate-800">{lease.leaseNumber}</td>
-                    <td className="px-5 py-3 text-slate-600">{lease.stallNumber}</td>
+                    <td className="px-5 py-3 text-slate-600">{lease.stallNo}</td>
                     <td className="px-5 py-3 text-slate-600">{lease.tenantName}</td>
                     <td className="px-5 py-3 text-slate-600">
                       {new Date(lease.startDate).toLocaleDateString('zh-CN')} ~ {new Date(lease.endDate).toLocaleDateString('zh-CN')}
                     </td>
-                    <td className="px-5 py-3 text-slate-600">¥{lease.monthlyRent.toLocaleString('zh-CN')}</td>
+                    <td className="px-5 py-3 text-slate-600">¥{(lease.monthlyRent ?? 0).toLocaleString('zh-CN')}</td>
                     <td className="px-5 py-3">
                       <StatusBadge status={lease.status} />
                     </td>

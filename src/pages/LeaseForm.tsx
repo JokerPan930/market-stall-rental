@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Grid2X2 } from 'lucide-react'
+import StallPicker from '@/components/StallPicker'
 
-// 摊位选项类型
-interface StallOption {
+// 选中的摊位类型
+interface SelectedStall {
   id: number
-  stallNumber: string
+  stallNo: string
+  area: string
+  size: number
   pricePerMonth: number
 }
 
@@ -13,6 +16,7 @@ interface StallOption {
 interface TenantOption {
   id: number
   name: string
+  phone?: string
 }
 
 // 合同表单数据类型
@@ -28,8 +32,9 @@ interface LeaseFormData {
 
 export default function LeaseForm() {
   const navigate = useNavigate()
-  const [stallOptions, setStallOptions] = useState<StallOption[]>([])
   const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([])
+  const [selectedStall, setSelectedStall] = useState<SelectedStall | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [form, setForm] = useState<LeaseFormData>({
     stallId: '',
     tenantId: '',
@@ -43,43 +48,33 @@ export default function LeaseForm() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchOptions()
+    fetchTenants()
   }, [])
 
-  // 获取摊位和租户选项
-  const fetchOptions = async () => {
+  // 获取租户列表
+  const fetchTenants = async () => {
     try {
-      const [stallsRes, tenantsRes] = await Promise.all([
-        fetch('/api/stalls?status=available&pageSize=100', { credentials: 'include' }),
-        fetch('/api/tenants?pageSize=100', { credentials: 'include' }),
-      ])
-      const stallsData = await stallsRes.json()
-      const tenantsData = await tenantsRes.json()
-      if (stallsData.success) setStallOptions(stallsData.data || [])
-      if (tenantsData.success) setTenantOptions(tenantsData.data || [])
+      const res = await fetch('/api/tenants?pageSize=200', { credentials: 'include' })
+      const data = await res.json()
+      if (data.success) setTenantOptions(data.data || [])
     } catch {
-      // 使用模拟数据
-      setStallOptions([
-        { id: 2, stallNumber: 'A-002', pricePerMonth: 4000 },
-        { id: 6, stallNumber: 'B-003', pricePerMonth: 2600 },
-        { id: 7, stallNumber: 'C-005', pricePerMonth: 3200 },
-      ])
+      // 模拟数据
       setTenantOptions([
-        { id: 1, name: '张三' },
-        { id: 2, name: '李四' },
-        { id: 3, name: '王五' },
-        { id: 4, name: '赵六' },
+        { id: 1, name: '张三', phone: '13800000001' },
+        { id: 2, name: '李四', phone: '13800000002' },
+        { id: 3, name: '王五', phone: '13800000003' },
+        { id: 4, name: '赵六', phone: '13800000004' },
       ])
     }
   }
 
-  // 选择摊位时自动填充月租金
-  const handleStallChange = (stallId: string) => {
-    const stall = stallOptions.find((s) => s.id === Number(stallId))
+  // 从弹窗选择摊位
+  const handleStallSelected = (stall: SelectedStall) => {
+    setSelectedStall(stall)
     setForm({
       ...form,
-      stallId: stallId ? Number(stallId) : '',
-      monthlyRent: stall ? stall.pricePerMonth : '',
+      stallId: stall.id,
+      monthlyRent: stall.pricePerMonth,
     })
   }
 
@@ -116,11 +111,13 @@ export default function LeaseForm() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
           stallId: Number(form.stallId),
           tenantId: Number(form.tenantId),
+          startDate: form.startDate,
+          endDate: form.endDate,
           monthlyRent: Number(form.monthlyRent),
           deposit: Number(form.deposit) || 0,
+          notes: form.notes,
         }),
       })
       const data = await res.json()
@@ -153,23 +150,55 @@ export default function LeaseForm() {
       {/* 表单 */}
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <form onSubmit={handleSubmit} className="space-y-5 max-w-lg">
-          {/* 选择摊位 */}
+          {/* 选择摊位 - 可视化弹窗 */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               选择摊位 <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.stallId}
-              onChange={(e) => handleStallChange(e.target.value)}
-              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="w-full flex items-center justify-between px-4 py-3 border border-slate-300 rounded-lg hover:border-primary-500 hover:bg-primary-50/30 transition-colors"
             >
-              <option value="">请选择摊位（仅显示空置摊位）</option>
-              {stallOptions.map((stall) => (
-                <option key={stall.id} value={stall.id}>
-                  {stall.stallNumber}（月租金 ¥{stall.pricePerMonth.toLocaleString('zh-CN')}）
-                </option>
-              ))}
-            </select>
+              {selectedStall ? (
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                    <Grid2X2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">
+                      {selectedStall.stallNo}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {selectedStall.area} · {selectedStall.size}㎡ · ¥{selectedStall.pricePerMonth.toLocaleString('zh-CN')}/月
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center">
+                    <Grid2X2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-500">点击选择摊位</div>
+                    <div className="text-xs text-slate-400">按分区可视化查看，点击空置摊位即可选中</div>
+                  </div>
+                </div>
+              )}
+              <span className="text-xs text-primary-600 font-medium flex-shrink-0">
+                {selectedStall ? '重新选择' : '选择 →'}
+              </span>
+            </button>
+
+            {/* 已选摊位信息提示 */}
+            {selectedStall && (
+              <div className="mt-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 flex items-start gap-2">
+                <span className="text-emerald-500">✓</span>
+                <span>
+                  已选中摊位 {selectedStall.stallNo}，月租金已自动填充为 ¥{selectedStall.pricePerMonth.toLocaleString('zh-CN')}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 选择租户 */}
@@ -185,7 +214,7 @@ export default function LeaseForm() {
               <option value="">请选择租户</option>
               {tenantOptions.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
-                  {tenant.name}
+                  {tenant.name}{tenant.phone ? `（${tenant.phone}）` : ''}
                 </option>
               ))}
             </select>
@@ -227,7 +256,7 @@ export default function LeaseForm() {
               value={form.monthlyRent}
               onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })}
               className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="默认取摊位月租金"
+              placeholder="请输入月租金金额"
               min="0"
               step="0.01"
             />
@@ -289,6 +318,13 @@ export default function LeaseForm() {
           </div>
         </form>
       </div>
+
+      {/* 可视化摊位选择器弹窗 */}
+      <StallPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleStallSelected}
+      />
     </div>
   )
 }
