@@ -6,6 +6,7 @@ import Dashboard from '@/pages/Dashboard'
 import Stalls from '@/pages/Stalls'
 import StallDetail from '@/pages/StallDetail'
 import StallForm from '@/pages/StallForm'
+import Areas from '@/pages/Areas'
 import Tenants from '@/pages/Tenants'
 import TenantDetail from '@/pages/TenantDetail'
 import TenantForm from '@/pages/TenantForm'
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/stalls/new" element={<StallForm />} />
           <Route path="/stalls/:id" element={<StallDetail />} />
           <Route path="/stalls/:id/edit" element={<StallForm />} />
+          <Route path="/areas" element={<Areas />} />
           <Route path="/tenants" element={<Tenants />} />
           <Route path="/tenants/new" element={<TenantForm />} />
           <Route path="/tenants/:id" element={<TenantDetail />} />

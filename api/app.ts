@@ -31,6 +31,7 @@ import leasesRoutes from './routes/leases.js'
 import feesRoutes from './routes/fees.js'
 import dashboardRoutes from './routes/dashboard.js'
 import usersRoutes from './routes/users.js'
+import areasRouter from './routes/areas.js'
 
 // ESM 模式下获取 __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -81,6 +82,7 @@ app.use('/api/leases', authMiddleware, leasesRoutes)
 app.use('/api/fees', authMiddleware, feesRoutes)
 app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/users', authMiddleware, usersRoutes)
+app.use('/api/areas', authMiddleware, areasRouter)
 
 /**
  * 健康检查

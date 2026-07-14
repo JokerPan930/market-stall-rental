@@ -11,7 +11,7 @@ const router = Router()
  * 获取租户列表（支持分页、关键词/状态筛选）
  * GET /api/tenants
  */
-router.get('/', (req: Request, res: Response): void => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1
     const pageSize = parseInt(req.query.pageSize as string) || 20
@@ -32,13 +32,13 @@ router.get('/', (req: Request, res: Response): void => {
     }
 
     // 获取总数
-    const countResult = db.prepare(
+    const countResult = await db.prepare(
       `SELECT COUNT(*) as total FROM tenants t ${whereClause}`
     ).get(...params) as { total: number }
 
     // 获取分页数据
     const offset = (page - 1) * pageSize
-    const tenants = db.prepare(
+    const tenants = await db.prepare(
       `SELECT t.* FROM tenants t ${whereClause} ORDER BY t.id DESC LIMIT ? OFFSET ?`
     ).all(...params, pageSize, offset)
 
@@ -56,19 +56,19 @@ router.get('/', (req: Request, res: Response): void => {
  * 获取租户详情（含当前租赁和费用记录）
  * GET /api/tenants/:id
  */
-router.get('/:id', (req: Request, res: Response): void => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
 
     // 获取租户信息
-    const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(id) as any
+    const tenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(id) as any
     if (!tenant) {
       res.status(404).json({ success: false, error: '租户不存在' })
       return
     }
 
     // 获取当前租赁信息
-    const leases = db.prepare(`
+    const leases = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, s.size
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id
@@ -77,7 +77,7 @@ router.get('/:id', (req: Request, res: Response): void => {
     `).all(id)
 
     // 获取费用记录
-    const fees = db.prepare(`
+    const fees = await db.prepare(`
       SELECT f.*, l.start_date, l.end_date, s.stall_no
       FROM fees f
       JOIN leases l ON f.lease_id = l.id
@@ -103,7 +103,7 @@ router.get('/:id', (req: Request, res: Response): void => {
  * 新增租户
  * POST /api/tenants
  */
-router.post('/', (req: Request, res: Response): void => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, phone, id_card, address, remark, status } = req.body
 
@@ -112,12 +112,13 @@ router.post('/', (req: Request, res: Response): void => {
       return
     }
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO tenants (name, phone, id_card, address, remark, status)
       VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id
     `).run(name, phone, id_card || null, address || null, remark || null, status || 'active')
 
-    const newTenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(result.lastInsertRowid)
+    const newTenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(result.lastInsertRowid)
 
     res.status(201).json({ success: true, data: newTenant })
   } catch (error) {
@@ -129,19 +130,19 @@ router.post('/', (req: Request, res: Response): void => {
  * 更新租户
  * PUT /api/tenants/:id
  */
-router.put('/:id', (req: Request, res: Response): void => {
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { name, phone, id_card, address, remark, status } = req.body
 
     // 检查租户是否存在
-    const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(id)
+    const tenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(id)
     if (!tenant) {
       res.status(404).json({ success: false, error: '租户不存在' })
       return
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tenants SET
         name = COALESCE(?, name),
         phone = COALESCE(?, phone),
@@ -152,7 +153,7 @@ router.put('/:id', (req: Request, res: Response): void => {
       WHERE id = ?
     `).run(name || null, phone || null, id_card || null, address || null, remark !== undefined ? remark : null, status || null, id)
 
-    const updatedTenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(id)
+    const updatedTenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(id)
 
     res.json({ success: true, data: updatedTenant })
   } catch (error) {

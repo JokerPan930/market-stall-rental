@@ -13,7 +13,7 @@ const router = Router()
  * 用户登录
  * POST /api/auth/login
  */
-router.post('/login', (req: Request, res: Response): void => {
+router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password, remember } = req.body
 
@@ -26,7 +26,7 @@ router.post('/login', (req: Request, res: Response): void => {
     const md5Password = crypto.createHash('md5').update(password).digest('hex')
 
     // 查询用户
-    const user = db.prepare(
+    const user = await db.prepare(
       'SELECT id, username, role, display_name, enabled FROM users WHERE username = ? AND password = ?'
     ).get(username, md5Password) as {
       id: number
@@ -52,7 +52,7 @@ router.post('/login', (req: Request, res: Response): void => {
     const maxAge = remember ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
     const expiresAt = new Date(Date.now() + maxAge).toISOString()
 
-    db.prepare(
+    await db.prepare(
       'INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'
     ).run(sessionId, user.id, expiresAt)
 
@@ -81,13 +81,13 @@ router.post('/login', (req: Request, res: Response): void => {
  * 用户登出
  * POST /api/auth/logout
  */
-router.post('/logout', (req: Request, res: Response): void => {
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   try {
     const sessionId = req.cookies?.session_id
 
     if (sessionId) {
       // 删除会话记录
-      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+      await db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
     }
 
     // 清除 cookie
@@ -104,7 +104,7 @@ router.post('/logout', (req: Request, res: Response): void => {
  * GET /api/auth/me
  * 注意：此路由不需要 authMiddleware，因为登录后需要立即调用
  */
-router.get('/me', (req: Request, res: Response): void => {
+router.get('/me', async (req: Request, res: Response): Promise<void> => {
   try {
     const sessionId = req.cookies?.session_id
 
@@ -114,7 +114,7 @@ router.get('/me', (req: Request, res: Response): void => {
     }
 
     // 查询会话
-    const session = db.prepare(`
+    const session = await db.prepare(`
       SELECT s.user_id, s.expires_at, u.username, u.role, u.display_name, u.enabled
       FROM sessions s
       JOIN users u ON s.user_id = u.id
@@ -135,7 +135,7 @@ router.get('/me', (req: Request, res: Response): void => {
 
     // 检查会话是否过期
     if (new Date(session.expires_at) <= new Date()) {
-      db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
+      await db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
       res.status(401).json({ success: false, error: '会话已过期' })
       return
     }

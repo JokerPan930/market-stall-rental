@@ -10,23 +10,23 @@ const router = Router()
 /**
  * 检查并更新即将到期的合同状态（30天内到期更新为 expiring）
  */
-function checkExpiringLeases(): void {
-  db.prepare(`
-    UPDATE leases SET status = 'expiring', updated_at = datetime('now')
+async function checkExpiringLeases(): Promise<void> {
+  await db.prepare(`
+    UPDATE leases SET status = 'expiring', updated_at = CURRENT_TIMESTAMP
     WHERE status = 'active'
-    AND date(end_date) <= date('now', '+30 days')
-    AND date(end_date) > date('now')
+    AND end_date::date <= CURRENT_DATE + INTERVAL '30 days'
+    AND end_date::date > CURRENT_DATE
   `).run()
 }
 
 /**
  * 检查并更新已过期的合同状态
  */
-function checkExpiredLeases(): void {
-  db.prepare(`
-    UPDATE leases SET status = 'expired', updated_at = datetime('now')
+async function checkExpiredLeases(): Promise<void> {
+  await db.prepare(`
+    UPDATE leases SET status = 'expired', updated_at = CURRENT_TIMESTAMP
     WHERE status IN ('active', 'expiring')
-    AND date(end_date) <= date('now')
+    AND end_date::date <= CURRENT_DATE
   `).run()
 }
 
@@ -34,11 +34,11 @@ function checkExpiredLeases(): void {
  * 获取租赁列表（支持分页、状态筛选）
  * GET /api/leases
  */
-router.get('/', (req: Request, res: Response): void => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     // 每次查询时自动检查合同状态
-    checkExpiringLeases()
-    checkExpiredLeases()
+    await checkExpiringLeases()
+    await checkExpiredLeases()
 
     const page = parseInt(req.query.page as string) || 1
     const pageSize = parseInt(req.query.pageSize as string) || 20
@@ -53,13 +53,13 @@ router.get('/', (req: Request, res: Response): void => {
     }
 
     // 获取总数
-    const countResult = db.prepare(
+    const countResult = await db.prepare(
       `SELECT COUNT(*) as total FROM leases l ${whereClause}`
     ).get(...params) as { total: number }
 
     // 获取分页数据
     const offset = (page - 1) * pageSize
-    const leases = db.prepare(`
+    const leases = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, s.size, t.name as tenant_name, t.phone as tenant_phone
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id
@@ -83,11 +83,11 @@ router.get('/', (req: Request, res: Response): void => {
  * 获取租赁详情
  * GET /api/leases/:id
  */
-router.get('/:id', (req: Request, res: Response): void => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
 
-    const lease = db.prepare(`
+    const lease = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, s.size, s.price_per_month, t.name as tenant_name, t.phone as tenant_phone, t.id_card
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id
@@ -101,7 +101,7 @@ router.get('/:id', (req: Request, res: Response): void => {
     }
 
     // 获取费用记录
-    const fees = db.prepare(
+    const fees = await db.prepare(
       'SELECT * FROM fees WHERE lease_id = ? ORDER BY month DESC'
     ).all(id)
 
@@ -121,9 +121,9 @@ router.get('/:id', (req: Request, res: Response): void => {
  * 签订合同（同时更新摊位状态为 rented，生成首月费用）
  * POST /api/leases
  */
-router.post('/', (req: Request, res: Response): void => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { stall_id, tenant_id, start_date, end_date, monthly_rent, deposit, remark } = req.body
+    const { stall_id, tenant_id, start_date, end_date, monthly_rent, deposit, remark, water_electricity, parking_fee } = req.body
 
     if (!stall_id || !tenant_id || !start_date || !end_date || !monthly_rent) {
       res.status(400).json({ success: false, error: '摊位、租户、起止日期和月租金为必填项' })
@@ -131,7 +131,7 @@ router.post('/', (req: Request, res: Response): void => {
     }
 
     // 检查摊位是否存在且为空置状态
-    const stall = db.prepare('SELECT * FROM stalls WHERE id = ?').get(stall_id) as any
+    const stall = await db.prepare('SELECT * FROM stalls WHERE id = ?').get(stall_id) as any
     if (!stall) {
       res.status(404).json({ success: false, error: '摊位不存在' })
       return
@@ -142,7 +142,7 @@ router.post('/', (req: Request, res: Response): void => {
     }
 
     // 检查租户是否存在
-    const tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(tenant_id) as any
+    const tenant = await db.prepare('SELECT * FROM tenants WHERE id = ?').get(tenant_id) as any
     if (!tenant) {
       res.status(404).json({ success: false, error: '租户不存在' })
       return
@@ -154,10 +154,11 @@ router.post('/', (req: Request, res: Response): void => {
       const leaseResult = db.prepare(`
         INSERT INTO leases (stall_id, tenant_id, start_date, end_date, monthly_rent, deposit, status, remark)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?)
+        RETURNING id
       `).run(stall_id, tenant_id, start_date, end_date, monthly_rent, deposit || 0, remark || null)
 
       // 更新摊位状态为已出租
-      db.prepare("UPDATE stalls SET status = 'rented', updated_at = datetime('now') WHERE id = ?").run(stall_id)
+      db.prepare("UPDATE stalls SET status = 'rented', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(stall_id)
 
       // 生成首月费用
       const leaseId = leaseResult.lastInsertRowid
@@ -166,20 +167,37 @@ router.post('/', (req: Request, res: Response): void => {
       // 应缴日期为当月10号
       const dueDate = `${month}-10`
 
+      // 生成首月租金费用
       db.prepare(`
-        INSERT INTO fees (lease_id, tenant_id, month, amount, status, due_date, remark)
-        VALUES (?, ?, ?, ?, 'unpaid', ?, ?)
+        INSERT INTO fees (lease_id, tenant_id, month, amount, status, due_date, fee_type, water_electricity_amount, parking_fee, remark)
+        VALUES (?, ?, ?, ?, 'unpaid', ?, 'rent', 0, 0, ?)
       `).run(leaseId, tenant_id, month, monthly_rent, dueDate, '首月租金')
+
+      // 如果有水电费，生成首月水电费
+      if (water_electricity && Number(water_electricity) > 0) {
+        db.prepare(`
+          INSERT INTO fees (lease_id, tenant_id, month, amount, status, due_date, fee_type, water_electricity_amount, parking_fee, remark)
+          VALUES (?, ?, ?, ?, 'unpaid', ?, 'water_electricity', ?, 0, ?)
+        `).run(leaseId, tenant_id, month, Number(water_electricity), dueDate, Number(water_electricity), '首月水电费')
+      }
+
+      // 如果有停车费，生成首月停车费
+      if (parking_fee && Number(parking_fee) > 0) {
+        db.prepare(`
+          INSERT INTO fees (lease_id, tenant_id, month, amount, status, due_date, fee_type, water_electricity_amount, parking_fee, remark)
+          VALUES (?, ?, ?, ?, 'unpaid', ?, 'parking', 0, ?, ?)
+        `).run(leaseId, tenant_id, month, Number(parking_fee), dueDate, Number(parking_fee), '首月停车费')
+      }
 
       return leaseId
     })
 
-    const leaseId = transaction()
+    const leaseId = await transaction()
 
     // 检查合同是否即将到期
-    checkExpiringLeases()
+    await checkExpiringLeases()
 
-    const newLease = db.prepare(`
+    const newLease = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, t.name as tenant_name, t.phone as tenant_phone
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id
@@ -197,7 +215,7 @@ router.post('/', (req: Request, res: Response): void => {
  * 续租
  * POST /api/leases/:id/renew
  */
-router.post('/:id/renew', (req: Request, res: Response): void => {
+router.post('/:id/renew', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { end_date, monthly_rent, remark } = req.body
@@ -208,7 +226,7 @@ router.post('/:id/renew', (req: Request, res: Response): void => {
     }
 
     // 检查合同是否存在
-    const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(id) as any
+    const lease = await db.prepare('SELECT * FROM leases WHERE id = ?').get(id) as any
     if (!lease) {
       res.status(404).json({ success: false, error: '租赁合同不存在' })
       return
@@ -220,20 +238,20 @@ router.post('/:id/renew', (req: Request, res: Response): void => {
     }
 
     // 更新合同
-    db.prepare(`
+    await db.prepare(`
       UPDATE leases SET
         end_date = ?,
         monthly_rent = COALESCE(?, monthly_rent),
         status = 'active',
         remark = COALESCE(?, remark),
-        updated_at = datetime('now')
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(end_date, monthly_rent || null, remark || null, id)
 
     // 检查合同是否即将到期
-    checkExpiringLeases()
+    await checkExpiringLeases()
 
-    const updatedLease = db.prepare(`
+    const updatedLease = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, t.name as tenant_name, t.phone as tenant_phone
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id
@@ -251,13 +269,13 @@ router.post('/:id/renew', (req: Request, res: Response): void => {
  * 退租（同时更新摊位状态为 vacant）
  * POST /api/leases/:id/terminate
  */
-router.post('/:id/terminate', (req: Request, res: Response): void => {
+router.post('/:id/terminate', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { remark } = req.body
 
     // 检查合同是否存在
-    const lease = db.prepare('SELECT * FROM leases WHERE id = ?').get(id) as any
+    const lease = await db.prepare('SELECT * FROM leases WHERE id = ?').get(id) as any
     if (!lease) {
       res.status(404).json({ success: false, error: '租赁合同不存在' })
       return
@@ -272,17 +290,17 @@ router.post('/:id/terminate', (req: Request, res: Response): void => {
     const transaction = db.transaction(() => {
       // 更新合同状态为已终止
       db.prepare(`
-        UPDATE leases SET status = 'terminated', remark = COALESCE(?, remark), updated_at = datetime('now')
+        UPDATE leases SET status = 'terminated', remark = COALESCE(?, remark), updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(remark || null, id)
 
       // 更新摊位状态为空置
-      db.prepare("UPDATE stalls SET status = 'vacant', updated_at = datetime('now') WHERE id = ?").run(lease.stall_id)
+      db.prepare("UPDATE stalls SET status = 'vacant', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(lease.stall_id)
     })
 
-    transaction()
+    await transaction()
 
-    const updatedLease = db.prepare(`
+    const updatedLease = await db.prepare(`
       SELECT l.*, s.stall_no, s.area, t.name as tenant_name, t.phone as tenant_phone
       FROM leases l
       JOIN stalls s ON l.stall_id = s.id

@@ -1,4 +1,5 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Store,
@@ -7,13 +8,24 @@ import {
   Banknote,
   Settings,
   LogOut,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 
 // 导航菜单项配置
 const navItems = [
   { path: '/', label: '仪表盘', icon: LayoutDashboard },
-  { path: '/stalls', label: '摊位管理', icon: Store },
+  {
+    path: '/stalls',
+    label: '摊位管理',
+    icon: Store,
+    children: [
+      { path: '/stalls', label: '摊位管理' },
+      { path: '/areas', label: '区域管理' },
+    ],
+  },
   { path: '/tenants', label: '租户管理', icon: Users },
   { path: '/leases', label: '租赁管理', icon: FileText },
   { path: '/finance', label: '费用管理', icon: Banknote },
@@ -23,6 +35,8 @@ const navItems = [
 export default function Layout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
 
   // 退出登录
   const handleLogout = async () => {
@@ -30,71 +44,120 @@ export default function Layout() {
     navigate('/login')
   }
 
+  // 判断菜单是否激活
+  const isMenuActive = (path: string, children?: { path: string }[]) => {
+    if (children) {
+      return children.some(c => location.pathname === c.path || location.pathname.startsWith(c.path + '/'))
+    }
+    return location.pathname === path
+  }
+
+  // 切换子菜单
+  const toggleMenu = (path: string) => {
+    setOpenMenu(openMenu === path ? null : path)
+  }
+
   return (
-    <div className="flex h-screen bg-slate-100">
-      {/* 左侧导航栏 */}
-      <aside className="w-60 flex-shrink-0 bg-primary-700 text-white flex flex-col">
-        {/* 系统名称 */}
-        <div className="px-5 py-6 border-b border-primary-600">
-          <h1 className="text-lg font-bold leading-tight">市场摊位</h1>
-          <h1 className="text-lg font-bold leading-tight">租赁管理系统</h1>
-        </div>
+    <div className="flex flex-col h-screen bg-slate-100">
+      {/* 顶部导航栏 */}
+      <header className="bg-primary-700 text-white flex-shrink-0 shadow-lg">
+        <div className="flex items-center justify-between px-6 h-14">
+          {/* 系统名称 */}
+          <div className="flex items-center gap-3">
+            <Store className="w-6 h-6" />
+            <h1 className="text-lg font-bold tracking-wide">市场摊位租赁管理系统</h1>
+          </div>
 
-        {/* 导航菜单 */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-5 py-3 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary-800 text-white'
-                    : 'text-primary-100 hover:bg-primary-600 hover:text-white'
-                }`
+          {/* 导航菜单 */}
+          <nav className="flex items-center gap-1">
+            {navItems.map((item) => {
+              const isActive = isMenuActive(item.path, item.children)
+              const hasChildren = item.children && item.children.length > 0
+              const isOpen = openMenu === item.path
+
+              if (hasChildren) {
+                return (
+                  <div key={item.path} className="relative">
+                    <button
+                      onClick={() => toggleMenu(item.path)}
+                      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-primary-800 text-white shadow-sm'
+                          : 'text-primary-100 hover:bg-primary-600 hover:text-white'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                      {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                    {/* 子菜单 */}
+                    {isOpen && (
+                      <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[120px] z-50">
+                        {item.children!.map((child) => (
+                          <NavLink
+                            key={child.path}
+                            to={child.path}
+                            onClick={() => setOpenMenu(null)}
+                            className={({ isActive }) =>
+                              `block px-4 py-2 text-sm transition-colors ${
+                                isActive
+                                  ? 'bg-primary-50 text-primary-700 font-medium'
+                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                              }`
+                            }
+                          >
+                            {child.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
               }
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
 
-        {/* 底部用户信息 */}
-        <div className="px-5 py-4 border-t border-primary-600">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-sm font-medium flex-shrink-0">
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-primary-800 text-white shadow-sm'
+                        : 'text-primary-100 hover:bg-primary-600 hover:text-white'
+                    }`
+                  }
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            })}
+          </nav>
+
+          {/* 用户信息 */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-sm font-medium">
                 {user?.displayName?.charAt(0) || 'U'}
               </div>
-              <span className="text-sm truncate">{user?.displayName || '用户'}</span>
+              <span className="text-sm">{user?.displayName || '用户'}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="text-primary-200 hover:text-white transition-colors"
+              className="text-primary-200 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-primary-600"
               title="退出登录"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* 右侧内容区 */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* 顶部标题栏 */}
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 flex-shrink-0">
-          <h2 className="text-base font-semibold text-slate-800">
-            市场摊位租赁管理系统
-          </h2>
-        </header>
-
-        {/* 内容区域 */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
-        </main>
-      </div>
+      {/* 内容区域 */}
+      <main className="flex-1 overflow-y-auto p-6">
+        <Outlet />
+      </main>
     </div>
   )
 }

@@ -27,6 +27,8 @@ interface LeaseFormData {
   endDate: string
   monthlyRent: number | string
   deposit: number | string
+  waterElectricity: number | string
+  parkingFee: number | string
   notes: string
 }
 
@@ -42,6 +44,8 @@ export default function LeaseForm() {
     endDate: '',
     monthlyRent: '',
     deposit: '',
+    waterElectricity: '',
+    parkingFee: '',
     notes: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -117,6 +121,8 @@ export default function LeaseForm() {
           endDate: form.endDate,
           monthlyRent: Number(form.monthlyRent),
           deposit: Number(form.deposit) || 0,
+          waterElectricity: Number(form.waterElectricity) || 0,
+          parkingFee: Number(form.parkingFee) || 0,
           notes: form.notes,
         }),
       })
@@ -257,6 +263,38 @@ export default function LeaseForm() {
               onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })}
               className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               placeholder="请输入月租金金额"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          {/* 水电费 */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              水电费(元/月)
+            </label>
+            <input
+              type="number"
+              value={form.waterElectricity}
+              onChange={(e) => setForm({ ...form, waterElectricity: e.target.value })}
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="请输入水电费金额"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          {/* 停车费 */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              停车费(元/月)
+            </label>
+            <input
+              type="number"
+              value={form.parkingFee}
+              onChange={(e) => setForm({ ...form, parkingFee: e.target.value })}
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="请输入停车费金额"
               min="0"
               step="0.01"
             />

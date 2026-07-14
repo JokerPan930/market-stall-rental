@@ -12,9 +12,9 @@ const router = Router()
  * 获取用户列表
  * GET /api/users
  */
-router.get('/', (req: Request, res: Response): void => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = db.prepare(
+    const users = await db.prepare(
       'SELECT id, username, role, display_name, enabled, created_at FROM users ORDER BY id ASC'
     ).all()
 
@@ -28,7 +28,7 @@ router.get('/', (req: Request, res: Response): void => {
  * 新增用户（密码 MD5 加密）
  * POST /api/users
  */
-router.post('/', (req: Request, res: Response): void => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password, role, display_name, enabled } = req.body
 
@@ -38,7 +38,7 @@ router.post('/', (req: Request, res: Response): void => {
     }
 
     // 检查用户名是否已存在
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
+    const existing = await db.prepare('SELECT id FROM users WHERE username = ?').get(username)
     if (existing) {
       res.status(400).json({ success: false, error: '用户名已存在' })
       return
@@ -47,12 +47,13 @@ router.post('/', (req: Request, res: Response): void => {
     // 对密码进行 MD5 加密
     const md5Password = crypto.createHash('md5').update(password).digest('hex')
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO users (username, password, role, display_name, enabled)
       VALUES (?, ?, ?, ?, ?)
+      RETURNING id
     `).run(username, md5Password, role, display_name, enabled !== undefined ? enabled : 1)
 
-    const newUser = db.prepare(
+    const newUser = await db.prepare(
       'SELECT id, username, role, display_name, enabled, created_at FROM users WHERE id = ?'
     ).get(result.lastInsertRowid)
 
@@ -66,13 +67,13 @@ router.post('/', (req: Request, res: Response): void => {
  * 更新用户
  * PUT /api/users/:id
  */
-router.put('/:id', (req: Request, res: Response): void => {
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { username, role, display_name, enabled } = req.body
 
     // 检查用户是否存在
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
+    const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(id)
     if (!user) {
       res.status(404).json({ success: false, error: '用户不存在' })
       return
@@ -80,14 +81,14 @@ router.put('/:id', (req: Request, res: Response): void => {
 
     // 如果修改了用户名，检查是否重复
     if (username && username !== (user as any).username) {
-      const existing = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, id)
+      const existing = await db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, id)
       if (existing) {
         res.status(400).json({ success: false, error: '用户名已存在' })
         return
       }
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE users SET
         username = COALESCE(?, username),
         role = COALESCE(?, role),
@@ -96,7 +97,7 @@ router.put('/:id', (req: Request, res: Response): void => {
       WHERE id = ?
     `).run(username || null, role || null, display_name || null, enabled !== undefined ? enabled : null, id)
 
-    const updatedUser = db.prepare(
+    const updatedUser = await db.prepare(
       'SELECT id, username, role, display_name, enabled, created_at FROM users WHERE id = ?'
     ).get(id)
 
@@ -110,7 +111,7 @@ router.put('/:id', (req: Request, res: Response): void => {
  * 修改密码
  * PUT /api/users/:id/password
  */
-router.put('/:id/password', (req: Request, res: Response): void => {
+router.put('/:id/password', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params
     const { old_password, new_password } = req.body
@@ -121,7 +122,7 @@ router.put('/:id/password', (req: Request, res: Response): void => {
     }
 
     // 检查用户是否存在
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any
+    const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any
     if (!user) {
       res.status(404).json({ success: false, error: '用户不存在' })
       return
@@ -136,7 +137,7 @@ router.put('/:id/password', (req: Request, res: Response): void => {
 
     // 更新密码
     const newMd5Password = crypto.createHash('md5').update(new_password).digest('hex')
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(newMd5Password, id)
+    await db.prepare('UPDATE users SET password = ? WHERE id = ?').run(newMd5Password, id)
 
     res.json({ success: true })
   } catch (error) {
